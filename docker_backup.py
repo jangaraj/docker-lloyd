@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import sys, os, commands
+from docker import Client
 
 def system_command(clicommand, type):
      try:
@@ -47,19 +48,22 @@ def send_email(to, efrom, subject, message):
 
 sprefix = system_command('date +"' + os.environ['PREFIX'] + '"', 'output')
 ssuffix = system_command('date +"' + os.environ['SUFFIX'] + '"', 'output')
-tar = sprefix + sys.argv[1] + ssuffix + ".tar"
 
-print "BACKUP: %s - %s/%s" % (sys.argv[1], os.environ['BACKUPS'], tar)
-if system_command('/docker-backup/docker-backup ' + os.environ['OPTS'] + ' \
-      -addr /docker.sock store "' + os.environ['BACKUPS'] + '/' + tar + '" "' \
-       + sys.argv[1] + '"', 'status') != 0:
-    sys.exit(1)
+c = Client(base_url='unix://docker.sock', version='1.18')
+volumes = c.inspect_container(sys.argv[1])['Volumes']
+for volume in volumes:
+    tar_path = os.environ['BACKUPS'] + sprefix + \
+                   sys.argv[1] + '_' + volume.replace('/', '-')[1:] + ssuffix + ".tar.gz"
+    tar_command = "tar -zvcf " + tar_path + " " + volumes[volume]
 
-system_command('gzip "' + os.environ['BACKUPS'] + '/' + tar + '"', 'status')
+    print "BACKUP: %s" % (sys.argv[1])
+    if system_command(tar_command, 'status') != 0:
+        continue;
 
-print "UPLOAD: %s - %s/%s" % (sys.argv[1], os.environ['BACKUPS'], tar)
+    print "UPLOAD: %s" % (sys.argv[1])
 
-system_command('s3cmd --access_key="' + os.environ['ACCESS_KEY'] + '" --secret_key="' + os.environ['SECRET_KEY'] + \
-          '" -c /dev/null ' + os.environ['S3CMD_OPTS'] + ' put "' + os.environ['BACKUPS'] + '/' + tar + '.gz" ' + \
+    system_command('s3cmd --access_key="' + os.environ['ACCESS_KEY'] + '" --secret_key="' + os.environ['SECRET_KEY'] + \
+          '" -c /dev/null ' + os.environ['S3CMD_OPTS'] + ' put "' + tar_path + '" ' + \
           os.environ['BUCKET'], 'status')
-system_command('rm "'+ os.environ['BACKUPS'] + '/' + tar + '.gz"', 'status')
+      
+    system_command('rm "'+ tar_path + '"', 'status')

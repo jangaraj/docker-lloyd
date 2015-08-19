@@ -5,7 +5,6 @@ if [ "$DEBUG" = "" ]; then
 fi
 if [ "$DEBUG" == 0 ]; then
   exec 1>/dev/null
-  #exec 2>/dev/null
 fi
 if [ "$TIMEOUT" = "" ]; then
   export TIMEOUT=86400
@@ -24,9 +23,9 @@ if [ "$S3CMD_OPTS" = "" ]; then
   export S3CMD_OPTS=""
 fi
 if [ "$BACKUPS" = "" ]; then
-  export BACKUPS="/backups"
+  export BACKUPS="/backups/"
 else
-  export BACKUPS=$BACKUPS
+  export BACKUPS="${BACKUPS}/"
 fi
 if [ "$EMAIL_FROM" = "" ]; then
   export EMAIL_FROM=""
